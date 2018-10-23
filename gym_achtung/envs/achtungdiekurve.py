@@ -13,6 +13,7 @@ import numpy as np
 
 WINWIDTH = 480  # width of the program's window, in pixels
 WINHEIGHT = 480  # height in pixels
+TEXT_SPACING = 130
 RADIUS = 2      # radius of the circles
 PLAYERS = 1      # number of players
 SKIP_PROBABILITY = 0
@@ -118,9 +119,9 @@ class AchtungDieKurve(gym.Env):
     """
 
     def __init__(self,
-                 width=WINWIDTH,
+                 width=WINWIDTH + TEXT_SPACING,
                  height=WINHEIGHT, fps=30, frame_skip=1, num_steps=1,
-                 force_fps=True, display_screen=False, add_noop_action=True, rng=24):
+                 force_fps=True, add_noop_action=True, rng=24):
 
         self.actions = {
             "left": K_a,
@@ -138,7 +139,6 @@ class AchtungDieKurve(gym.Env):
         self.force_fps = force_fps
         self.viewer = None
         self.add_noop_action = add_noop_action
-        self.display_screen = display_screen
         self.last_action = []
         self.action = []
         self.height = height
@@ -150,7 +150,6 @@ class AchtungDieKurve(gym.Env):
         self._action_set = self.getActions()
         self.action_space = spaces.Discrete(len(self._action_set))
         self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype = np.uint8)
-
         self.rewards = {    # TODO: take as input
                     "positive": 1.0,
                     "negative": -1.0,
@@ -162,6 +161,7 @@ class AchtungDieKurve(gym.Env):
 
         self._setup()
         self.init()
+        self.my_font = pygame.font.SysFont('bauhaus93', 37)
 
     def _setup(self):
         """
@@ -273,7 +273,6 @@ class AchtungDieKurve(gym.Env):
         for i in range(self.num_steps):
             time_elapsed = self._tick()
             self.__step(time_elapsed)
-            self._draw_frame()
 
         self.frame_count += self.num_steps
 
@@ -287,52 +286,6 @@ class AchtungDieKurve(gym.Env):
         self.previous_score = self.getScore()
 
         return reward
-
-    def getScreenRGB(self):
-        """
-        Returns the current game screen in RGB format.
-
-        Returns
-        --------
-        numpy uint8 array
-            Returns a numpy array with the shape (width, height, 3).
-
-        """
-
-        return pygame.surfarray.array3d(
-            pygame.display.get_surface()).astype(np.uint8)
-
-    def getScreenGrayscale(self):
-        """
-        Gets the current game screen in Grayscale format. Converts from RGB using relative lumiance.
-
-        Returns
-        --------
-        numpy uint8 array
-                Returns a numpy array with the shape (width, height).
-
-
-        """
-        frame = self.getScreenRGB()
-        frame = 0.21 * frame[:, :, 0] + 0.72 * \
-            frame[:, :, 1] + 0.07 * frame[:, :, 2]
-        frame = np.round(frame).astype(np.uint8)
-
-        return frame
-
-    def getFrameNumber(self):
-        """
-        Gets the current number of frames the agent has seen
-        since PLE was initialized.
-
-        Returns
-        --------
-
-        int
-
-        """
-
-        return self.frame_count
 
     def _tick(self):
         """
@@ -400,14 +353,6 @@ class AchtungDieKurve(gym.Env):
     def game_over(self):
         return self.lives == -1
 
-    def _draw_frame(self):
-        """
-        Decides if the screen will be drawn too
-        """
-
-        if self.display_screen:
-            pygame.display.update()
-
     def setRNG(self, rng):
         """
         Sets the rng for games.
@@ -458,8 +403,8 @@ class AchtungDieKurve(gym.Env):
             self.score += self.rewards["loss"]
 
         self.player.beam(self.screen)
-
         self.player.draw(self.screen)
+        self.draw_text()
 
     def step(self, a):
         reward = self.act(self._action_set[a])
@@ -468,8 +413,7 @@ class AchtungDieKurve(gym.Env):
         return state, reward, terminal, {}
 
     def reset(self):
-        #self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3), dtype=np.uint8)
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype=np.uint8)
         self.last_action = []
         self.action = []
         self.previous_score = 0.0
@@ -477,20 +421,31 @@ class AchtungDieKurve(gym.Env):
         state = self.getGameState()
         return state
 
+    def draw_text(self):
+        pygame.draw.rect(self.screen, WHITE, (WINWIDTH, 0, 10, WINHEIGHT))
+        pygame.draw.rect(self.screen, BG_COLOR, (WINWIDTH + 10, 0, 120, WINHEIGHT))
+
+        state = self.getGameState()
+        x_msg = self.my_font.render("X:{}".format(state[0]), 1, WHITE)
+        y_msg = self.my_font.render("Y:{}".format(state[1]), 1, WHITE)
+        a_msg = self.my_font.render("A:{}".format(state[2]), 1, WHITE)
+        b1_msg = self.my_font.render("B1:{}".format(state[3]), 1, WHITE)
+        b2_msg = self.my_font.render("B2:{}".format(state[4]), 1, WHITE)
+        b3_msg = self.my_font.render("B3:{}".format(state[5]), 1, WHITE)
+        b4_msg = self.my_font.render("B4:{}".format(state[6]), 1, WHITE)
+        b5_msg = self.my_font.render("B5:{}".format(state[7]), 1, WHITE)
+
+        self.screen.blit(x_msg, (WINWIDTH + TEXT_SPACING - 110, WINHEIGHT / 10))
+        self.screen.blit(y_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 40))
+        self.screen.blit(a_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 80))
+        self.screen.blit(b1_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 120))
+        self.screen.blit(b2_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 160))
+        self.screen.blit(b3_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 200))
+        self.screen.blit(b4_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 240))
+        self.screen.blit(b5_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 280))
+
     def render(self, mode='human', close=False):
-        if close:
-            if self.viewer is not None:
-                self.viewer.close()
-                self.viewer = None
-            return
-        img = self.getScreenRGB()
-        if mode == 'rgb_array':
-            return img
-        elif mode == 'human':
-            from gym.envs.classic_control import rendering
-            if self.viewer is None:
-                self.viewer = rendering.SimpleImageViewer()
-            self.viewer.imshow(img)
+        pygame.display.update()
 
     def seed(self, seed):
         rng = np.random.RandomState(seed)
