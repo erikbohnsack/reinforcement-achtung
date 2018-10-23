@@ -7,7 +7,7 @@ import numpy as np
 class PLEEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
 
-    def __init__(self, game_name='FlappyBird', display_screen=True):
+    def __init__(self, game_name='snake', display_screen=True):
         # set headless mode
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 

@@ -6,7 +6,6 @@ import gym_achtung
 import gym_ple
 
 
-
 # The world's simplest agent!
 class RandomAgent(object):
     def __init__(self, action_space):
@@ -49,6 +48,8 @@ if __name__ == '__main__':
             env.render()
             action = agent.act(ob, reward, done)
             ob, reward, done, _ = env.step(action)
+            print('Observation ', ob)
+            print('Reard', reward)
             if done:
                 break
             # Note there's no env.render() here. But the environment still can open window and
