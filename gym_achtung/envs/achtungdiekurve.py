@@ -71,7 +71,7 @@ class AchtungPlayer:
                 d_bounce = screen.get_at((_x, _y)) != BG_COLOR
 
             if d_bounce or i == self.sight:
-                _distance = math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)
+                _distance = int(np.round(math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)))
                 break
 
         return _distance
