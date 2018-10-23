@@ -18,17 +18,18 @@ if __name__ == '__main__':
 
     # Initializations
     num_actions = env.action_space.n
-    obs_dim     = env.observation_space.shape[0] * env.observation_space.shape[1] * 3
+
+    obs_dim = env.observation_space.shape[0]
 
     # Choose agent. Choose wisely.
     agent = DQNAgent(state_size=obs_dim, action_size=num_actions)
 
 
-    outdir = '/Users/erikbohnsack/Code/achtung-die-PLE/tmp'
+    outdir = '/Users/adamlilja/Code/achtung-die-PLE/tmp'
     env = Monitor(env, directory=outdir, force=True)
     env.seed(0)
 
-    episode_count = 10000
+    episode_count = 100
     reward = 0
     done = False
 
