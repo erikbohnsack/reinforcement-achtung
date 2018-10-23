@@ -382,6 +382,12 @@ class AchtungDieKurve(gym.Env):
         self._handle_player_events()
         self.score += self.rewards["tick"]
         self.player.update()
+        self.collision()
+        self.player.beam(self.screen)
+        self.player.draw(self.screen)
+        self.draw_text()
+
+    def collision(self):
         collide_check = 0
         try:
             x_check = (self.player.x < 0) or \
@@ -402,9 +408,7 @@ class AchtungDieKurve(gym.Env):
         if self.lives <= 0.0:
             self.score += self.rewards["loss"]
 
-        self.player.beam(self.screen)
-        self.player.draw(self.screen)
-        self.draw_text()
+
 
     def step(self, a):
         reward = self.act(self._action_set[a])
