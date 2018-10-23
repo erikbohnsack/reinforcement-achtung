@@ -15,8 +15,8 @@ WINWIDTH = 480  # width of the program's window, in pixels
 WINHEIGHT = 480  # height in pixels
 RADIUS = 2      # radius of the circles
 PLAYERS = 1      # number of players
-SKIP_PROBABILITY = 0.05
-
+SKIP_PROBABILITY = 0
+SPEED_CONSTANT = 2
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -26,7 +26,7 @@ P1COLOUR = RED
 P2COLOUR = GREEN
 P3COLOUR = BLUE
 BG_COLOR = (25, 25, 25)
-BEAM_SIGHT = 10
+BEAM_SIGHT = 240
 
 # basically just holds onto all of them
 class AchtungPlayer:
@@ -50,28 +50,28 @@ class AchtungPlayer:
 
     def move(self):
         # computes current movement
-        self.x += int(RADIUS * 3 * math.cos(math.radians(self.angle)))
-        self.y += int(RADIUS * 3 * math.sin(math.radians(self.angle)))
+        self.x += int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(self.angle)))
+        self.y += int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(self.angle)))
 
-    def beambounce(self, i, current_angle, screen):
+    def beambounce(self, current_angle, screen):
         _distance = 0
 
-        _x = self.x + i * int(RADIUS * 3 * math.cos(math.radians(current_angle)))
-        _y = self.y + i * int(RADIUS * 3 * math.sin(math.radians(current_angle)))
+        for i in range(1, self.sight + 1):
+            _distance = self.sight
+            _x = self.x + i * int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(current_angle)))
+            _y = self.y + i * int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(current_angle)))
 
-        x_check = (_x <= 0) or (_x >= WINWIDTH)
-        y_check = (_y <= 0) or (_y >= WINHEIGHT)
+            x_check = (_x <= 0) or (_x >= WINWIDTH)
+            y_check = (_y <= 0) or (_y >= WINHEIGHT)
 
-        if (x_check or y_check):
-            d_bounce = True
-        else:
-            d_bounce = screen.get_at((_x, _y)) != BG_COLOR
+            if (x_check or y_check):
+                d_bounce = True
+            else:
+                d_bounce = screen.get_at((_x, _y)) != BG_COLOR
 
-        if d_bounce or i == self.sight:
-            _distance = math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)
-
-        #pygame.draw.circle(screen, BLUE, (_x, _y), 1)
-        #time.sleep(0.1)
+            if d_bounce or i == self.sight:
+                _distance = math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)
+                break
 
         return _distance
 
@@ -83,12 +83,11 @@ class AchtungPlayer:
         right90angle = self.angle - 90
         right45angle = self.angle - 45
 
-        for i in range(1, self.sight+1):
-            self.dleft90 = self.beambounce(i, left90angle, screen)
-            self.dleft45 = self.beambounce(i, left45angle, screen)
-            self.dright90 = self.beambounce(i, right90angle, screen)
-            self.dright45 = self.beambounce(i, right45angle, screen)
-            self.dforward = self.beambounce(i, self.angle, screen)
+        self.dleft90 = self.beambounce(left90angle, screen)
+        self.dleft45 = self.beambounce(left45angle, screen)
+        self.dright90 = self.beambounce(right90angle, screen)
+        self.dright45 = self.beambounce(right45angle, screen)
+        self.dforward = self.beambounce(self.angle, screen)
 
     def draw(self, screen):
         if self.skip:
@@ -96,7 +95,7 @@ class AchtungPlayer:
         elif random.random() < SKIP_PROBABILITY:
             self.skip = 1
         else:
-            pygame.draw.circle(screen, WHITE, (self.x, self.y), self.width)
+            pygame.draw.circle(screen, self.color, (self.x, self.y), self.width)
 
     def update(self):
         self.move()
@@ -150,7 +149,7 @@ class AchtungDieKurve(gym.Env):
         self.rng = None
         self._action_set = self.getActions()
         self.action_space = spaces.Discrete(len(self._action_set))
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(1,), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype = np.uint8)
 
         self.rewards = {    # TODO: take as input
                     "positive": 1.0,
@@ -379,7 +378,7 @@ class AchtungDieKurve(gym.Env):
 
         """
 
-        state = (self.player.x, self.player.y, self.player.angle, self.player.dleft90, self.player.dleft45, self.player.dright90, self.player.dright45, self.player.dforward)
+        state = [self.player.x, self.player.y, self.player.angle, self.player.dleft90, self.player.dleft45, self.player.dright90, self.player.dright45, self.player.dforward]
 
         return state
 
@@ -421,12 +420,12 @@ class AchtungDieKurve(gym.Env):
         """
             Starts/Resets the game to its inital state
         """
-        self.player = AchtungPlayer(WHITE, RADIUS)
+        self.player = AchtungPlayer(RED, RADIUS)
         self.screen.fill(self.BG_COLOR)
         self.score = 0
         self.ticks = 0
         self.lives = 1
-        self.sight = 10
+        self.sight = BEAM_SIGHT
 
     def __step(self, dt):
         """
@@ -469,7 +468,8 @@ class AchtungDieKurve(gym.Env):
         return state, reward, terminal, {}
 
     def reset(self):
-        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3), dtype=np.uint8)
+        #self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype = np.uint8)
         self.last_action = []
         self.action = []
         self.previous_score = 0.0
