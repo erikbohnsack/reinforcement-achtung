@@ -1,29 +1,48 @@
 import gym_achtung
 import gym
+#from gym.wrappers import Monitor
 from baselines import deepq
-
-def callback(lcl, _glb):
-    # stop training if reward exceeds 199
-    is_solved = lcl['t'] > 100 and sum(lcl['episode_rewards'][-101:-1]) / 100 >= 199
-    return is_solved
-
+import time
+import json
 
 def main():
     env = gym.make("AchtungDieKurve-v1")
+
+    #env = Monitor(env, directory='./Monitor', force=True)
+
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    outputPathModel = 'achtung_model_' + str(timestr) + '.pkl'
+    outputPathInfo = 'achtung_info_' + str(timestr) + '.txt'
+
+    infoDict = {}
+    infoDict['total_timesteps'] = 1000000
+    infoDict['lr'] = 1e-4
+    infoDict['buffer_size'] = 100000
+    infoDict['exploration_fraction'] = 0.2
+    infoDict['prioritized_replay'] = True
+
+    print("Saving training information to achtung_info_%Y%m%d-%H%M%S.txt")
+    with open(outputPathInfo, 'w') as file:
+        file.write(json.dumps(infoDict))  # use `json.loads` to do the reverse
+
+
     act = deepq.learn(
         env,
         network='mlp',
-        lr=1e-3,
-        total_timesteps=100000,
-        buffer_size=50000,
-        exploration_fraction=0.1,
+        lr=5e-4,
+        total_timesteps=infoDict['total_timesteps'],
+        buffer_size=infoDict['buffer_size'],
+        exploration_fraction=infoDict['exploration_fraction'],
         exploration_final_eps=0.02,
-        print_freq=10,
-        callback=callback,
-        render=True
+        prioritized_replay = infoDict['prioritized_replay'],
+        print_freq=1000,
+        callback=None,
+        render=False
     )
-    print("Saving model to achtung_model.pkl")
-    act.save("achtung_model.pkl")
+    print("Saving model to achtung_model_%Y%m%d-%H%M%S.pkl")
+    act.save(outputPathModel)
+
+
 
 
 if __name__ == '__main__':

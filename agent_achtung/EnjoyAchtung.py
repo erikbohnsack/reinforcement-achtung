@@ -1,34 +1,61 @@
 import gym
 import gym_achtung
 from baselines import deepq
+from gym.wrappers import Monitor
+import pickle
+import os
+import time
 import matplotlib.pyplot as plt
 
-modelToRun = '/Users/adamlilja/Documents/Skola/deep-machine-learning/project/achtung-die-PLE/agent_achtung/achtung_model.pkl'
+modelToRun = 'achtung_model_20181023-204210.pkl'
 
 def main():
     env = gym.make("AchtungDieKurve-v1")
     act = deepq.learn(env, network='mlp', total_timesteps=0, load_path=modelToRun)
 
-    meanRewards = []
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    outputPath = './Sharks/' + timestr
+    os.makedirs(outputPath)
 
-    numberOfEvaluations = 25
+    #env = Monitor(env, directory= '/Monitor', force=True)
+
+    meanRewards = []
+    qValues = []
+    numberOfEvaluations = 50
     eval = 0
     while eval < numberOfEvaluations:
         eval += 1
         obs, done = env.reset(), False
         episode_rew = 0
+        episode_qVal = []
         while not done:
             env.render()
-            obs, rew, done, _ = env.step(act(obs)[0])
+
+            getActionQvalue = act(obs)
+            action = getActionQvalue[0][0]
+
+            obs, rew, done, _ = env.step(action)
+            #time.sleep(0.1)
+
             episode_rew += rew
+            episode_qVal.append(getActionQvalue[1])
 
         print("Episode reward", episode_rew)
         meanRewards.append(episode_rew)
+        qValues.append(episode_qVal)
 
-    plt.plot(meanRewards)
-    plt.ylabel('Mean Reward')
-    plt.xlabel('Episode')
-    plt.show()
+
+    outputNameReward = outputPath + '/EnjoyReward.pkl'
+    outputNameQvalues = outputPath + '/EnjoyQvalues.pkl'
+
+    with open(outputNameReward, 'wb') as f:
+        pickle.dump(meanRewards, f)
+        print('Rewards dumped @ ' + outputNameReward )
+
+    with open(outputNameQvalues, 'wb') as f:
+        pickle.dump(qValues, f)
+        print('Qvalues dumped @ ' + outputNameQvalues)
+
 
 if __name__ == '__main__':
     main()
