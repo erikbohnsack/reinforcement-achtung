@@ -36,7 +36,7 @@ BEAMS = range(BEAM_MAX_ANGLE, -BEAM_MAX_ANGLE-BEAM_STEP, -BEAM_STEP)
 # basically just holds onto all of them
 class AchtungPlayer:
 
-    def __init__(self, color, width):
+    def __init__(self, color, width, randomize=0):
         self.color = color
         self.score = 0
         self.skip = 0
@@ -45,11 +45,14 @@ class AchtungPlayer:
         self.x = random.randrange(50, WINWIDTH - WINWIDTH/4)
         self.y = random.randrange(50, WINHEIGHT - WINHEIGHT/4)
         self.angle = random.randrange(0, 360)
+        self.randomize = randomize
         self.sight = BEAM_SIGHT
         self.beams = np.ones(len(BEAMS)) * BEAM_SIGHT
 
     def move(self):
         # computes current movement
+        if self.randomize:
+            self.angle += np.random.choice([-5, 0, 5])
         if self.angle > 360:
             self.angle -= 360
         elif self.angle < 0:
@@ -98,7 +101,7 @@ class AchtungPlayer:
         self.move()
 
 
-class AchtungDieKurve(gym.Env):
+class AchtungDieKurveRandomOpponent(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
     """
     Parameters
@@ -360,6 +363,9 @@ class AchtungDieKurve(gym.Env):
             Starts/Resets the game to its inital state
         """
         self.player = AchtungPlayer(BLUE, RADIUS)
+        self.opponent = AchtungPlayer(RED, RADIUS, randomize=1)
+        self.opponent2 = AchtungPlayer(RED, RADIUS, randomize=1)
+        self.opponent3 = AchtungPlayer(RED, RADIUS, randomize=1)
         self.screen.fill(self.BG_COLOR)
         self.score = 0
         self.ticks = 0
@@ -376,9 +382,15 @@ class AchtungDieKurve(gym.Env):
         self._handle_player_events()
         self.score += self.rewards["tick"]
         self.player.update()
+        self.opponent.update()
+        self.opponent2.update()
+        self.opponent3.update()
         self.collision()
         self.player.beam(self.screen)
         self.player.draw(self.screen)
+        self.opponent.draw(self.screen)
+        self.opponent2.draw(self.screen)
+        self.opponent3.draw(self.screen)
         self.draw_text()
 
     def collision(self):
