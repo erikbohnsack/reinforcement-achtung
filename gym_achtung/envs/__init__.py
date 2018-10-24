@@ -1,1 +1,3 @@
 from gym_achtung.envs.achtungdiekurve import AchtungDieKurve
+from gym_achtung.envs.achtungdiekurve_randomopponent import AchtungDieKurveRandomOpponent
+from gym_achtung.envs.achtungdiekurve_fullimage import AchtungDieKurveFullImage

@@ -27,10 +27,6 @@ P1COLOUR = RED
 P2COLOUR = GREEN
 P3COLOUR = BLUE
 BG_COLOR = (25, 25, 25)
-BEAM_SIGHT = 240
-BEAM_MAX_ANGLE = 120
-BEAM_STEP = 30
-BEAMS = range(BEAM_MAX_ANGLE, -BEAM_MAX_ANGLE-BEAM_STEP, -BEAM_STEP)
 
 
 # basically just holds onto all of them
@@ -45,8 +41,6 @@ class AchtungPlayer:
         self.x = random.randrange(50, WINWIDTH - WINWIDTH/4)
         self.y = random.randrange(50, WINHEIGHT - WINHEIGHT/4)
         self.angle = random.randrange(0, 360)
-        self.sight = BEAM_SIGHT
-        self.beams = np.ones(len(BEAMS)) * BEAM_SIGHT
 
     def move(self):
         # computes current movement
@@ -56,35 +50,6 @@ class AchtungPlayer:
             self.angle += 360
         self.x += int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(self.angle)))
         self.y += int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(self.angle)))
-
-    def beambounce(self, current_angle, screen):
-        _distance = self.sight
-        for i in range(1, self.sight + 1):
-            _x = self.x + i * int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(current_angle)))
-            _y = self.y + i * int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(current_angle)))
-
-            x_check = (_x <= 0) or (_x >= WINWIDTH)
-            y_check = (_y <= 0) or (_y >= WINHEIGHT)
-
-            if (x_check or y_check):
-                d_bounce = True
-            else:
-                d_bounce = screen.get_at((_x, _y)) != BG_COLOR
-
-            if d_bounce or i == self.sight:
-                _distance = int(np.round(math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)))
-                break
-
-        return _distance
-
-    def beam(self, screen):
-        for index, angle in enumerate(BEAMS):
-            current_angle = self.angle + angle
-            if current_angle > 360:
-                current_angle -= 360
-            elif current_angle < 0:
-                current_angle += 360
-            self.beams[index] = self.beambounce(current_angle, screen)
 
     def draw(self, screen):
         if self.skip:
@@ -98,7 +63,7 @@ class AchtungPlayer:
         self.move()
 
 
-class AchtungDieKurve(gym.Env):
+class AchtungDieKurveFullImage(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
     """
     Parameters
@@ -145,7 +110,8 @@ class AchtungDieKurve(gym.Env):
         self.rng = None
         self._action_set = self.getActions()
         self.action_space = spaces.Discrete(len(self._action_set))
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3),
+                                            dtype=np.uint8)
         self.rewards = {    # TODO: take as input
                     "positive": 1.0,
                     "negative": -1.0,
@@ -267,7 +233,7 @@ class AchtungDieKurve(gym.Env):
         self._setAction(action)
         for i in range(self.num_steps):
             time_elapsed = self._tick()
-            self.__step(time_elapsed)
+            self.__step()
 
         self.frame_count += self.num_steps
 
@@ -312,22 +278,19 @@ class AchtungDieKurve(gym.Env):
             if key in self.rewards:
                 self.rewards[key] = rewards[key]
 
-    def getGameState(self):
+    def getScreenRGB(self):
         """
+        Returns the current game screen in RGB format.
 
         Returns
-        -------
-
-        dict
-            * x position.
-            * y position.
-
-            See code for structure.
+        --------
+        numpy uint8 array
+            Returns a numpy array with the shape (width, height, 3).
 
         """
 
-        state = np.hstack(([self.player.x, self.player.y, self.player.angle], self.player.beams))
-        return state
+        return pygame.surfarray.array3d(
+            pygame.display.get_surface()).astype(np.uint8)
 
     def getScreenDims(self):
         """
@@ -364,22 +327,18 @@ class AchtungDieKurve(gym.Env):
         self.score = 0
         self.ticks = 0
         self.lives = 1
-        self.sight = BEAM_SIGHT
 
-    def __step(self, dt):
+    def __step(self):
         """
             Perform one step of game emulation.
         """
-        dt /= 1000.0
 
         self.ticks += 1
         self._handle_player_events()
         self.score += self.rewards["tick"]
         self.player.update()
         self.collision()
-        self.player.beam(self.screen)
         self.player.draw(self.screen)
-        self.draw_text()
 
     def collision(self):
         collide_check = 0
@@ -404,49 +363,19 @@ class AchtungDieKurve(gym.Env):
 
     def step(self, a):
         reward = self.act(self._action_set[a[0]])
-        state = self.getGameState()
+        state = self.getScreenRGB()
         terminal = self.game_over()
         return state, reward, terminal, {}
 
     def reset(self):
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3),
+                                            dtype=np.uint8)
         self.last_action = []
         self.action = []
         self.previous_score = 0.0
         self.init()
-        state = self.getGameState()
+        state = self.getScreenRGB()
         return state
-
-    def draw_text(self):
-        pygame.draw.rect(self.screen, WHITE, (WINWIDTH, 0, 10, WINHEIGHT))
-        pygame.draw.rect(self.screen, BG_COLOR, (WINWIDTH + 10, 0, 120, WINHEIGHT))
-
-        state = self.getGameState()
-        x_msg = self.my_font.render("X:{}".format(state[0]), 1, WHITE)
-        y_msg = self.my_font.render("Y:{}".format(state[1]), 1, WHITE)
-        a_msg = self.my_font.render("A:{}".format(state[2]), 1, WHITE)
-        b1_msg = self.my_font.render("B1:{}".format(state[3]), 1, WHITE)
-        b2_msg = self.my_font.render("B2:{}".format(state[4]), 1, WHITE)
-        b3_msg = self.my_font.render("B3:{}".format(state[5]), 1, WHITE)
-        b4_msg = self.my_font.render("B4:{}".format(state[6]), 1, WHITE)
-        b5_msg = self.my_font.render("B5:{}".format(state[7]), 1, WHITE)
-        b6_msg = self.my_font.render("B6:{}".format(state[8]), 1, WHITE)
-        b7_msg = self.my_font.render("B7:{}".format(state[9]), 1, WHITE)
-        b8_msg = self.my_font.render("B8:{}".format(state[10]), 1, WHITE)
-        b9_msg = self.my_font.render("B9:{}".format(state[11]), 1, WHITE)
-
-        self.screen.blit(x_msg, (WINWIDTH + TEXT_SPACING - 110, 0))
-        self.screen.blit(y_msg, (WINWIDTH + TEXT_SPACING - 108, 40))
-        self.screen.blit(a_msg, (WINWIDTH + TEXT_SPACING - 108, 80))
-        self.screen.blit(b1_msg, (WINWIDTH + TEXT_SPACING - 108, 120))
-        self.screen.blit(b2_msg, (WINWIDTH + TEXT_SPACING - 108, 160))
-        self.screen.blit(b3_msg, (WINWIDTH + TEXT_SPACING - 108, 200))
-        self.screen.blit(b4_msg, (WINWIDTH + TEXT_SPACING - 108, 240))
-        self.screen.blit(b5_msg, (WINWIDTH + TEXT_SPACING - 108, 280))
-        self.screen.blit(b6_msg, (WINWIDTH + TEXT_SPACING - 108, 320))
-        self.screen.blit(b7_msg, (WINWIDTH + TEXT_SPACING - 108, 360))
-        self.screen.blit(b8_msg, (WINWIDTH + TEXT_SPACING - 108, 400))
-        self.screen.blit(b9_msg, (WINWIDTH + TEXT_SPACING - 108, 440))
 
     def render(self, mode='human', close=False):
         pygame.display.update()
