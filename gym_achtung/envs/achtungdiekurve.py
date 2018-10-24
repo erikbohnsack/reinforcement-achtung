@@ -28,6 +28,10 @@ P2COLOUR = GREEN
 P3COLOUR = BLUE
 BG_COLOR = (25, 25, 25)
 BEAM_SIGHT = 240
+BEAM_MAX_ANGLE = 120
+BEAM_STEP = 30
+BEAMS = range(BEAM_MAX_ANGLE, -BEAM_MAX_ANGLE-BEAM_STEP, -BEAM_STEP)
+
 
 # basically just holds onto all of them
 class AchtungPlayer:
@@ -43,22 +47,20 @@ class AchtungPlayer:
         self.angle = random.randrange(0, 360)
 
         self.sight = BEAM_SIGHT
-        self.dleft90 = BEAM_SIGHT
-        self.dleft45 = BEAM_SIGHT
-        self.dright90 = BEAM_SIGHT
-        self.dright45 = BEAM_SIGHT
-        self.dforward = BEAM_SIGHT
+        self.beams = np.ones(len(BEAMS)) * BEAM_SIGHT
 
     def move(self):
         # computes current movement
+        if self.angle > 360:
+            self.angle -= 360
+        elif self.angle < 0:
+            self.angle += 360
         self.x += int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(self.angle)))
         self.y += int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(self.angle)))
 
     def beambounce(self, current_angle, screen):
-        _distance = 0
-
+        _distance = self.sight
         for i in range(1, self.sight + 1):
-            _distance = self.sight
             _x = self.x + i * int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(current_angle)))
             _y = self.y + i * int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(current_angle)))
 
@@ -77,18 +79,13 @@ class AchtungPlayer:
         return _distance
 
     def beam(self, screen):
-        # Sends out beams in 5 directions in order to see the freespace distance
-
-        left90angle = self.angle + 90
-        left45angle = self.angle + 45
-        right90angle = self.angle - 90
-        right45angle = self.angle - 45
-
-        self.dleft90 = self.beambounce(left90angle, screen)
-        self.dleft45 = self.beambounce(left45angle, screen)
-        self.dright90 = self.beambounce(right90angle, screen)
-        self.dright45 = self.beambounce(right45angle, screen)
-        self.dforward = self.beambounce(self.angle, screen)
+        for index, angle in enumerate(BEAMS):
+            current_angle = self.angle + angle
+            if current_angle > 360:
+                current_angle -= 360
+            elif current_angle < 0:
+                current_angle += 360
+            self.beams[index] = self.beambounce(current_angle, screen)
 
     def draw(self, screen):
         if self.skip:
@@ -149,7 +146,7 @@ class AchtungDieKurve(gym.Env):
         self.rng = None
         self._action_set = self.getActions()
         self.action_space = spaces.Discrete(len(self._action_set))
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype = np.uint8)
         self.rewards = {    # TODO: take as input
                     "positive": 1.0,
                     "negative": -1.0,
@@ -331,8 +328,7 @@ class AchtungDieKurve(gym.Env):
 
         """
 
-        state = [self.player.x, self.player.y, self.player.angle, self.player.dleft90, self.player.dleft45, self.player.dright90, self.player.dright45, self.player.dforward]
-
+        state = np.hstack(([self.player.x, self.player.y, self.player.angle], self.player.beams))
         return state
 
     def getScreenDims(self):
@@ -417,7 +413,7 @@ class AchtungDieKurve(gym.Env):
         return state, reward, terminal, {}
 
     def reset(self):
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(8,), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype=np.uint8)
         self.last_action = []
         self.action = []
         self.previous_score = 0.0
@@ -438,15 +434,23 @@ class AchtungDieKurve(gym.Env):
         b3_msg = self.my_font.render("B3:{}".format(state[5]), 1, WHITE)
         b4_msg = self.my_font.render("B4:{}".format(state[6]), 1, WHITE)
         b5_msg = self.my_font.render("B5:{}".format(state[7]), 1, WHITE)
+        b6_msg = self.my_font.render("B6:{}".format(state[8]), 1, WHITE)
+        b7_msg = self.my_font.render("B7:{}".format(state[9]), 1, WHITE)
+        b8_msg = self.my_font.render("B8:{}".format(state[10]), 1, WHITE)
+        b9_msg = self.my_font.render("B9:{}".format(state[11]), 1, WHITE)
 
-        self.screen.blit(x_msg, (WINWIDTH + TEXT_SPACING - 110, WINHEIGHT / 10))
-        self.screen.blit(y_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 40))
-        self.screen.blit(a_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 80))
-        self.screen.blit(b1_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 120))
-        self.screen.blit(b2_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 160))
-        self.screen.blit(b3_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 200))
-        self.screen.blit(b4_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 240))
-        self.screen.blit(b5_msg, (WINWIDTH + TEXT_SPACING - 108, WINHEIGHT / 10 + 280))
+        self.screen.blit(x_msg, (WINWIDTH + TEXT_SPACING - 110, 0))
+        self.screen.blit(y_msg, (WINWIDTH + TEXT_SPACING - 108, 40))
+        self.screen.blit(a_msg, (WINWIDTH + TEXT_SPACING - 108, 80))
+        self.screen.blit(b1_msg, (WINWIDTH + TEXT_SPACING - 108, 120))
+        self.screen.blit(b2_msg, (WINWIDTH + TEXT_SPACING - 108, 160))
+        self.screen.blit(b3_msg, (WINWIDTH + TEXT_SPACING - 108, 200))
+        self.screen.blit(b4_msg, (WINWIDTH + TEXT_SPACING - 108, 240))
+        self.screen.blit(b5_msg, (WINWIDTH + TEXT_SPACING - 108, 280))
+        self.screen.blit(b6_msg, (WINWIDTH + TEXT_SPACING - 108, 320))
+        self.screen.blit(b7_msg, (WINWIDTH + TEXT_SPACING - 108, 360))
+        self.screen.blit(b8_msg, (WINWIDTH + TEXT_SPACING - 108, 400))
+        self.screen.blit(b9_msg, (WINWIDTH + TEXT_SPACING - 108, 440))
 
     def render(self, mode='human', close=False):
         pygame.display.update()
