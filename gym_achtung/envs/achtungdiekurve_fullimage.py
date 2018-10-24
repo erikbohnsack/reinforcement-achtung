@@ -82,11 +82,12 @@ class AchtungDieKurveFullImage(gym.Env):
     def __init__(self,
                  width=WINWIDTH + TEXT_SPACING,
                  height=WINHEIGHT, fps=30, frame_skip=1, num_steps=1,
-                 force_fps=True, add_noop_action=True, rng=24):
+                 force_fps=True, add_noop_action=False, rng=24):
 
         self.actions = {
             "left": K_a,
             "right": K_d,
+            "NOOP":K_F15
         }
 
         self.score = 0.0  # required.
@@ -219,6 +220,9 @@ class AchtungDieKurveFullImage(gym.Env):
         """
         return sum(self._oneStepAct(action) for i in range(self.frame_skip))
 
+    def get_keys_to_action(self):
+        return self.actions
+
     def _oneStepAct(self, action):
         """
         Performs an action on the game. Checks if the game is over or if the provided action is valid based on the allowed action set.
@@ -348,7 +352,7 @@ class AchtungDieKurveFullImage(gym.Env):
             y_check = (self.player.y < 0) or \
                       (self.player.y > self.height)
 
-            collide_check = self.screen.get_at((self.player.x, self.player.y)) != self.BG_COLOR
+            collide_check = self.screen.get_at((self.player.x, self.player.y)) != BG_COLOR
         except IndexError:
             x_check = (self.player.x < 0) or (self.player.x > self.width)
             y_check = (self.player.y < 0) or (self.player.y > self.height)
@@ -362,7 +366,10 @@ class AchtungDieKurveFullImage(gym.Env):
             self.score += self.rewards["loss"]
 
     def step(self, a):
-        reward = self.act(self._action_set[a[0]])
+        try:
+            reward = self.act(self._action_set[a])
+        except IndexError:
+            reward = self.act(self._action_set[a[0]])
         state = self.getScreenRGB()
         terminal = self.game_over()
         return state, reward, terminal, {}
@@ -389,7 +396,7 @@ class AchtungDieKurveFullImage(gym.Env):
 if __name__ == "__main__":
 
     pygame.init()
-    game = AchtungDieKurve(width=WINWIDTH, height=WINHEIGHT)
+    game = AchtungDieKurveFullImage(width=WINWIDTH, height=WINHEIGHT)
     game.clock = pygame.time.Clock()
     game.rng = np.random.RandomState(24)
     game.init()
