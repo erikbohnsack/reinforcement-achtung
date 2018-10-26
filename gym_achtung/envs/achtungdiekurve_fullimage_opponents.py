@@ -27,16 +27,12 @@ P1COLOUR = RED
 P2COLOUR = GREEN
 P3COLOUR = BLUE
 BG_COLOR = (25, 25, 25)
-BEAM_SIGHT = 240
-BEAM_MAX_ANGLE = 120
-BEAM_STEP = 30
-BEAMS = range(BEAM_MAX_ANGLE, -BEAM_MAX_ANGLE-BEAM_STEP, -BEAM_STEP)
 
 
 # basically just holds onto all of them
 class AchtungPlayer:
 
-    def __init__(self, color, width):
+    def __init__(self, color, width, randomize=0):
         self.color = color
         self.score = 0
         self.skip = 0
@@ -45,46 +41,18 @@ class AchtungPlayer:
         self.x = random.randrange(50, WINWIDTH - WINWIDTH/4)
         self.y = random.randrange(50, WINHEIGHT - WINHEIGHT/4)
         self.angle = random.randrange(0, 360)
-        self.sight = BEAM_SIGHT
-        self.beams = np.ones(len(BEAMS)) * BEAM_SIGHT
+        self.randomize = randomize
 
     def move(self):
         # computes current movement
+        if self.randomize:
+            self.angle += np.random.choice([-5, 0, 5])
         if self.angle > 360:
             self.angle -= 360
         elif self.angle < 0:
             self.angle += 360
         self.x += int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(self.angle)))
         self.y += int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(self.angle)))
-
-    def beambounce(self, current_angle, screen):
-        _distance = self.sight
-        for i in range(1, self.sight + 1):
-            _x = self.x + i * int(RADIUS * SPEED_CONSTANT * math.cos(math.radians(current_angle)))
-            _y = self.y + i * int(RADIUS * SPEED_CONSTANT * math.sin(math.radians(current_angle)))
-
-            x_check = (_x <= 0) or (_x >= WINWIDTH)
-            y_check = (_y <= 0) or (_y >= WINHEIGHT)
-
-            if (x_check or y_check):
-                d_bounce = True
-            else:
-                d_bounce = screen.get_at((_x, _y)) != BG_COLOR
-
-            if d_bounce or i == self.sight:
-                _distance = int(np.round(math.sqrt((self.x - _x) ** 2 + (self.y - _y) ** 2)))
-                break
-
-        return _distance
-
-    def beam(self, screen):
-        for index, angle in enumerate(BEAMS):
-            current_angle = self.angle + angle
-            if current_angle > 360:
-                current_angle -= 360
-            elif current_angle < 0:
-                current_angle += 360
-            self.beams[index] = self.beambounce(current_angle, screen)
 
     def draw(self, screen):
         if self.skip:
@@ -98,7 +66,7 @@ class AchtungPlayer:
         self.move()
 
 
-class AchtungDieKurve(gym.Env):
+class AchtungDieKurveFullImageRandomOpponent(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
     """
     Parameters
@@ -117,11 +85,12 @@ class AchtungDieKurve(gym.Env):
     def __init__(self,
                  width=WINWIDTH + TEXT_SPACING,
                  height=WINHEIGHT, fps=30, frame_skip=1, num_steps=1,
-                 force_fps=True, add_noop_action=True, rng=24):
+                 force_fps=True, add_noop_action=False, rng=24):
 
         self.actions = {
             "left": K_a,
             "right": K_d,
+            "NOOP":K_F15
         }
 
         self.score = 0.0  # required.
@@ -145,7 +114,8 @@ class AchtungDieKurve(gym.Env):
         self.rng = None
         self._action_set = self.getActions()
         self.action_space = spaces.Discrete(len(self._action_set))
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3),
+                                            dtype=np.uint8)
         self.rewards = {    # TODO: take as input
                     "positive": 1.0,
                     "negative": -1.0,
@@ -253,6 +223,9 @@ class AchtungDieKurve(gym.Env):
         """
         return sum(self._oneStepAct(action) for i in range(self.frame_skip))
 
+    def get_keys_to_action(self):
+        return self.actions
+
     def _oneStepAct(self, action):
         """
         Performs an action on the game. Checks if the game is over or if the provided action is valid based on the allowed action set.
@@ -267,7 +240,7 @@ class AchtungDieKurve(gym.Env):
         self._setAction(action)
         for i in range(self.num_steps):
             time_elapsed = self._tick()
-            self._step()
+            self.__step()
 
         self.frame_count += self.num_steps
 
@@ -297,12 +270,45 @@ class AchtungDieKurve(gym.Env):
         """
         return self.clock.tick_busy_loop(fps)
 
-    def getGameState(self):
+    def adjustRewards(self, rewards):
+        """
 
-        state = np.hstack(([self.player.x, self.player.y, self.player.angle], self.player.beams))
-        return state
+        Adjusts the rewards the game gives the agent
+
+        Parameters
+        ----------
+        rewards : dict
+            A dictonary of reward events to float rewards. Only updates if key matches those specificed in the init function.
+
+        """
+        for key in rewards.keys():
+            if key in self.rewards:
+                self.rewards[key] = rewards[key]
+
+    def getScreenRGB(self):
+        """
+        Returns the current game screen in RGB format.
+
+        Returns
+        --------
+        numpy uint8 array
+            Returns a numpy array with the shape (width, height, 3).
+
+        """
+
+        return pygame.surfarray.array3d(
+            pygame.display.get_surface()).astype(np.uint8)
 
     def getScreenDims(self):
+        """
+        Gets the screen dimensions of the game in tuple form.
+
+        Returns
+        -------
+        tuple of int
+            Returns tuple as follows (width, height).
+
+        """
         return self.screen_dim
 
     def getScore(self):
@@ -312,6 +318,10 @@ class AchtungDieKurve(gym.Env):
         return self.lives == -1
 
     def setRNG(self, rng):
+        """
+        Sets the rng for games.
+        """
+
         if self.rng is None:
             self.rng = rng
 
@@ -320,13 +330,15 @@ class AchtungDieKurve(gym.Env):
             Starts/Resets the game to its inital state
         """
         self.player = AchtungPlayer(BLUE, RADIUS)
+        self.opponent = AchtungPlayer(RED, RADIUS, randomize=1)
+        self.opponent2 = AchtungPlayer(RED, RADIUS, randomize=1)
+        self.opponent3 = AchtungPlayer(RED, RADIUS, randomize=1)
         self.screen.fill(self.BG_COLOR)
         self.score = 0
         self.ticks = 0
         self.lives = 1
-        self.sight = BEAM_SIGHT
 
-    def _step(self):
+    def __step(self):
         """
             Perform one step of game emulation.
         """
@@ -335,77 +347,54 @@ class AchtungDieKurve(gym.Env):
         self._handle_player_events()
         self.score += self.rewards["tick"]
         self.player.update()
-        if self.collision(self.player.x, self.player.y, self.player.skip):
-            self.lives = -1
-        self.player.beam(self.screen)
+        self.opponent.update()
+        self.opponent2.update()
+        self.opponent3.update()
+        self.collision()
         self.player.draw(self.screen)
-        self.draw_text()
+        self.opponent.draw(self.screen)
+        self.opponent2.draw(self.screen)
+        self.opponent3.draw(self.screen)
 
-    def collision(self, x, y, skip):
+    def collision(self):
         collide_check = 0
         try:
-            x_check = (x < 0) or \
-                      (x > self.width)
-            y_check = (y < 0) or \
-                      (y > self.height)
+            x_check = (self.player.x < 0) or \
+                      (self.player.x > self.width)
+            y_check = (self.player.y < 0) or \
+                      (self.player.y > self.height)
 
-            collide_check = self.screen.get_at((x, y)) != self.BG_COLOR
+            collide_check = self.screen.get_at((self.player.x, self.player.y)) != BG_COLOR
         except IndexError:
-            x_check = (x < 0) or (x > self.width)
-            y_check = (y < 0) or (y > self.height)
+            x_check = (self.player.x < 0) or (self.player.x > self.width)
+            y_check = (self.player.y < 0) or (self.player.y > self.height)
 
-        if skip:
+        if self.player.skip:
             collide_check = 0
         if x_check or y_check or collide_check:
-            return True
-        else:
-            return False
+            self.lives = -1
+
+        if self.lives <= 0.0:
+            self.score += self.rewards["loss"]
 
     def step(self, a):
-        reward = self.act(self._action_set[a])
-        state = self.getGameState()
+        try:
+            reward = self.act(self._action_set[a])
+        except IndexError:
+            reward = self.act(self._action_set[a[0]])
+        state = self.getScreenRGB()
         terminal = self.game_over()
         return state, reward, terminal, {}
 
     def reset(self):
-        self.observation_space = spaces.Box(low=0, high=WINWIDTH, shape=(12,), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_dim[0], self.screen_dim[1], 3),
+                                            dtype=np.uint8)
         self.last_action = []
         self.action = []
         self.previous_score = 0.0
         self.init()
-        state = self.getGameState()
+        state = self.getScreenRGB()
         return state
-
-    def draw_text(self):
-        pygame.draw.rect(self.screen, WHITE, (WINWIDTH, 0, 10, WINHEIGHT))
-        pygame.draw.rect(self.screen, BG_COLOR, (WINWIDTH + 10, 0, 120, WINHEIGHT))
-
-        state = self.getGameState()
-        x_msg = self.my_font.render("X:{}".format(state[0]), 1, WHITE)
-        y_msg = self.my_font.render("Y:{}".format(state[1]), 1, WHITE)
-        a_msg = self.my_font.render("A:{}".format(state[2]), 1, WHITE)
-        b1_msg = self.my_font.render("B1:{}".format(state[3]), 1, WHITE)
-        b2_msg = self.my_font.render("B2:{}".format(state[4]), 1, WHITE)
-        b3_msg = self.my_font.render("B3:{}".format(state[5]), 1, WHITE)
-        b4_msg = self.my_font.render("B4:{}".format(state[6]), 1, WHITE)
-        b5_msg = self.my_font.render("B5:{}".format(state[7]), 1, WHITE)
-        b6_msg = self.my_font.render("B6:{}".format(state[8]), 1, WHITE)
-        b7_msg = self.my_font.render("B7:{}".format(state[9]), 1, WHITE)
-        b8_msg = self.my_font.render("B8:{}".format(state[10]), 1, WHITE)
-        b9_msg = self.my_font.render("B9:{}".format(state[11]), 1, WHITE)
-
-        self.screen.blit(x_msg, (WINWIDTH + TEXT_SPACING - 110, 0))
-        self.screen.blit(y_msg, (WINWIDTH + TEXT_SPACING - 108, 40))
-        self.screen.blit(a_msg, (WINWIDTH + TEXT_SPACING - 108, 80))
-        self.screen.blit(b1_msg, (WINWIDTH + TEXT_SPACING - 108, 120))
-        self.screen.blit(b2_msg, (WINWIDTH + TEXT_SPACING - 108, 160))
-        self.screen.blit(b3_msg, (WINWIDTH + TEXT_SPACING - 108, 200))
-        self.screen.blit(b4_msg, (WINWIDTH + TEXT_SPACING - 108, 240))
-        self.screen.blit(b5_msg, (WINWIDTH + TEXT_SPACING - 108, 280))
-        self.screen.blit(b6_msg, (WINWIDTH + TEXT_SPACING - 108, 320))
-        self.screen.blit(b7_msg, (WINWIDTH + TEXT_SPACING - 108, 360))
-        self.screen.blit(b8_msg, (WINWIDTH + TEXT_SPACING - 108, 400))
-        self.screen.blit(b9_msg, (WINWIDTH + TEXT_SPACING - 108, 440))
 
     def render(self, mode='human', close=False):
         pygame.display.update()
@@ -419,7 +408,7 @@ class AchtungDieKurve(gym.Env):
 if __name__ == "__main__":
 
     pygame.init()
-    game = AchtungDieKurve(width=WINWIDTH, height=WINHEIGHT)
+    game = AchtungDieKurveFullImage(width=WINWIDTH, height=WINHEIGHT)
     game.clock = pygame.time.Clock()
     game.rng = np.random.RandomState(24)
     game.init()

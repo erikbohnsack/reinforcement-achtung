@@ -5,7 +5,7 @@ from gym.utils import play
 
 
 def main():
-    env = gym.make("AchtungDieKurveFullImage-v1")
+    env = gym.make("AchtungDieKurveFullImageRandomOpponent-v1")
     play.play(env, fps=30)
 
 
