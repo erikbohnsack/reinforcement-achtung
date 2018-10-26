@@ -7,7 +7,7 @@ import os
 import time
 import matplotlib.pyplot as plt
 
-modelToRun = 'achtung_model_20181023-204210.pkl'
+modelToRun = 'achtung_best_bot.pkl'
 
 def main():
     env = gym.make("AchtungDieKurve-v1")
@@ -29,8 +29,6 @@ def main():
         episode_rew = 0
         episode_qVal = []
         while not done:
-            env.render()
-
             getActionQvalue = act(obs)
             action = getActionQvalue[0][0]
 

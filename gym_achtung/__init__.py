@@ -23,3 +23,19 @@ register(
     reward_threshold=1.0,
     nondeterministic=True,
 )
+
+register(
+    id='AchtungDieKurveFullImageRandomOpponent-v1',
+    entry_point='gym_achtung.envs:AchtungDieKurveFullImageRandomOpponent',
+    timestep_limit=100000,
+    reward_threshold=1.0,
+    nondeterministic=True,
+)
+
+register(
+    id='AchtungDieKurveAgainstBot-v1',
+    entry_point='gym_achtung.envs:AchtungDieKurveAgainstBot',
+    timestep_limit=100000,
+    reward_threshold=1.0,
+    nondeterministic=True,
+)
