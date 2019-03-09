@@ -16,7 +16,8 @@ WINHEIGHT = 480  # height in pixels
 TEXT_SPACING = 130
 RADIUS = 2      # radius of the circles
 PLAYERS = 1      # number of players
-SKIP_PROBABILITY = 0
+SKIP_PROBABILITY = 0.01
+SKIP_COUNT = 4
 SPEED_CONSTANT = 2
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -40,6 +41,7 @@ class AchtungPlayer:
         self.color = color
         self.score = 0
         self.skip = 0
+        self.skip_counter = 0
         # generates random position and direction
         self.width = width
         self.x = random.randrange(50, WINWIDTH - WINWIDTH/4)
@@ -88,7 +90,10 @@ class AchtungPlayer:
 
     def draw(self, screen):
         if self.skip:
-            self.skip = 0
+            self.skip_counter += 1
+            if self.skip_counter == SKIP_COUNT:
+                self.skip_counter = 0
+                self.skip = 0
         elif random.random() < SKIP_PROBABILITY:
             self.skip = 1
         else:

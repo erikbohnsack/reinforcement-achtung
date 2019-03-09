@@ -7,7 +7,7 @@ import os
 import time
 import matplotlib.pyplot as plt
 
-modelToRun = 'achtung_model_20181023-204210.pkl'
+modelToRun = 'achtung_best_bot.pkl'
 
 
 def main():

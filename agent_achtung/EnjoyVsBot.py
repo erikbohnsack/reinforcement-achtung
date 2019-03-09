@@ -7,7 +7,6 @@ from gym.utils import play
 
 model_to_run = "achtung_best_bot.pkl"
 
-
 def main():
     env = gym.make("AchtungDieKurveAgainstBot-v1")
     number_of_evaluations = 50
