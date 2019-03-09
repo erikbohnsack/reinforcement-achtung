@@ -1,32 +1,22 @@
 # achtung-die-PLE
-Make sure you are in the correct environment (such as dml or dml_game)
 
-To install PLE:
-```
-git clone https://github.com/ntasfi/PyGame-Learning-Environment.git
-cd PyGame-Learning-Environment/
-pip install -e .
-```
-To install pygame:
-```
-pip install pygame
-```
+A try to master Achtung Die Kurve using Reinforcement learning.
 
-To install gym_ple:
-```
-pip install gym_ple
-```
-Try to run flappy bird example from folder (ffmpeg download maybe required):
-```
-python ./example.py
-```
-Test output in "hard drive"/tmp/random-agent-result.  
+Ended up creating a technically proficient little devil, 
+but without any kind of tactical sense. This was due to
+the environment the agent could see was narrowed down to 
+a handful of beams, signalling the distance to a wall/opponent 
+in a couple of different angles. 
 
-TODO:  
-Write a snake implementation using gym-ple  
-Modify snake to work like achtung die kurve  
-Train  
-Win  
-https://github.com/lusob/gym-ple  
-https://github.com/ntasfi/PyGame-Learning-Environment  
-https://gym.openai.com/  
+`gym_achtung/envs` holds the `AchtungDieKurve` class,
+which is basically the game, subclassed from OpenAI `gym.Env`.
+
+`agent_achtung/TrainAchtung` are different training alternatives.
+Full image uses the full image as input. Random Opponent competes against
+random bots just thrown onto the playing field. There are also `EnjoyAchtung`
+files which basically  
+
+## Requirements
+
+1. gym
+2. baselines
